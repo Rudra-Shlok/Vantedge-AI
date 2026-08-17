@@ -1,0 +1,338 @@
+import streamlit as st
+from ultralytics import YOLO
+from PIL import Image
+import numpy as np
+import cv2
+import time
+
+# -----------------------------------------------------------------------------
+# 1. Luxury Page & UI Architecture (Advanced CSS)
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="AURUM | Vision Waste Console",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Deep Obsidian, Gold, & Rich Metal Theme
+st.markdown("""
+<style>
+    /* Load Google Font */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+
+    .stApp {
+        background-color: #000000;
+        color: #E0E0E0;
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    /* Header Customization */
+    h1, h2, h3 {
+        color: #FFFFFF;
+        font-weight: 300;
+        letter-spacing: -0.01em;
+    }
+    h1.luxury-head {
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        background: linear-gradient(135deg, #E6C657 0%, #B6922E 50%, #E6C657 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 600;
+        font-size: 2rem;
+        margin-bottom: 0.2rem;
+    }
+    .luxury-subhead {
+        color: #A1A1AA;
+        font-size: 0.9rem;
+        margin-top: 0;
+        margin-bottom: 2rem;
+    }
+
+    /* Container Styling (Glassmorphism) */
+    .element-container, div[data-testid="stVerticalBlock"] > div {
+        background: transparent;
+    }
+    
+    div.stCard {
+        background-color: #0A0A0A;
+        border: 1px solid #262626;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Reference Cards - Integrated on Main Page */
+    .integrated-ref-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .ref-card {
+        padding: 1rem;
+        border-radius: 8px;
+        border-top: 4px solid;
+        background-color: #0A0A0A;
+        border-left: 1px solid #1A1A1A;
+        border-right: 1px solid #1A1A1A;
+        border-bottom: 1px solid #1A1A1A;
+    }
+    
+    .ref-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
+    .ref-desc { font-size: 0.75rem; color: #D4D4D8; line-height: 1.4; }
+
+    /* Button and Input Styling */
+    div.stButton > button:first-child {
+        background: linear-gradient(135deg, #262626 0%, #1A1A1A 100%);
+        color: #E6C657;
+        border: 1px solid #E6C657;
+        border-radius: 6px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(135deg, #E6C657 0%, #B6922E 100%);
+        color: #000000;
+        border-color: #000000;
+        box-shadow: 0 0 15px rgba(230, 198, 87, 0.4);
+    }
+    
+    /* Segment Table Styling */
+    div[data-testid="stDataFrame"] {
+        background-color: #0A0A0A;
+        border-radius: 8px;
+        border: 1px solid #262626;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# 2. Rich Color Palette & Class Mapping (All 31 Classes)
+# -----------------------------------------------------------------------------
+
+# Optimized Bin Colors (Format: B, G, R)
+# Providing bright colors for boxes and rich, dark counterparts for masks.
+BIN_COLOR_MAP = {
+    "Blue": {
+        "bright": (246, 130, 59),  # #3B82F6 Bright
+        "dark": (150, 60, 10),    # #0A3C96 Rich Dark for Mask
+        "hex": "#3B82F6"
+    },
+    "Green": {
+        "bright": (129, 185, 16),  # #10B981 Bright
+        "dark": (20, 100, 10),    # #0A6414 Rich Dark for Mask
+        "hex": "#10B981"
+    },
+    "Black": {
+        "bright": (180, 180, 180), # Lighter grey for box visibility
+        "dark": (30, 30, 30),      # #1E1E1E Dark for Mask
+        "hex": "#A1A1AA"
+    },
+    "Yellow": {
+        "bright": (8, 179, 234),   # #EAB308 Bright
+        "dark": (10, 100, 130),   # #82640A Rich Dark for Mask
+        "hex": "#EAB308"
+    }
+}
+
+# The complete mapping for the 31 provided classes.
+CLASS_TO_BIN = {
+    # Blue Bin (Dry Recyclables)
+    "cardboard": "Blue", "cloth": "Blue", "dairy packets": "Blue", "glass bottle": "Blue",
+    "metal can": "Blue", "packaging box": "Blue", "paper": "Blue", "paper bag": "Blue",
+    "paper cup": "Blue", "paper utensils": "Blue", "plastic bag": "Blue", "plastic bits": "Blue",
+    "plastic bottle": "Blue", "plastic box": "Blue", "plastic cup": "Blue", "plastic packet": "Blue",
+    "plastic straw": "Blue", "plastic utensils": "Blue", "synthetic bag": "Blue", "thermocol": "Blue",
+    
+    # Green Bin (Organic / Compostable)
+    "coconut shell": "Green", "wood materials": "Green",
+    
+    # Black Bin (Sanitary / Hazardous / Non-recyclable Domestic)
+    "brick": "Black", "broken glass": "Black", "cigarette": "Black", "footwear": "Black",
+    "mask": "Black", "sanitary": "Black", "tile": "Black", "tobacco packet": "Black",
+    
+    # Yellow Bin (Biomedical / Clinical)
+    "medical waste": "Yellow"
+}
+
+# -----------------------------------------------------------------------------
+# 3. Rich High-Tech Engine (Segmentation Masks)
+# -----------------------------------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def load_engine(weights="best.pt"):
+    try:
+        return YOLO(weights)
+    except Exception as e:
+        st.error(f"Failed to load neural engine: {e}")
+        return None
+
+engine = load_engine()
+
+def draw_luxury_segmentation(image_pil, results_object):
+    """
+    Renders sharp bounding boxes AND rich, dark segmentation masks 
+    correlated to the target bin colors.
+    """
+    img_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+    h, w, _ = img_cv.shape
+    
+    # Create blank canvas for masks with 3 channels
+    mask_canvas = np.zeros((h, w, 3), dtype=np.uint8)
+    
+    detection_details = []
+    
+    # Get results data
+    boxes = results_object.boxes
+    masks = results_object.masks # REQUIRES yolo segmentation model
+
+    if masks is not None:
+        # Step 1: Draw ALL Masks first (to blend them together properly)
+        for i, mask in enumerate(masks):
+            label_id = int(boxes[i].cls[0])
+            label_name = engine.names.get(label_id, "Unknown")
+            conf = float(boxes[i].conf[0])
+            
+            # Determine Color Scheme
+            bin_category = CLASS_TO_BIN.get(label_name.lower(), "Black")
+            color_scheme = BIN_COLOR_MAP[bin_category]
+            
+            # Process mask: Scale to image size, convert to boolean mask
+            m_data = mask.data[0].cpu().numpy()
+            m_scaled = cv2.resize(m_data, (w, h))
+            bool_mask = m_scaled > 0.5
+            
+            # Draw the DARK, RICH color mask onto the canvas
+            mask_canvas[bool_mask] = color_scheme['dark']
+            
+            # Store details for Step 2
+            detection_details.append({
+                "label": label_name,
+                "conf": conf,
+                "bin": bin_category,
+                "bright_color": color_scheme['bright'],
+                "hex": color_scheme['hex'],
+                "coords": boxes[i].xyxy[0]
+            })
+
+        # Step 2: Blend masks onto original image with high opacity for 'dark object' look
+        # (Using 0.7 blend for a rich, deep saturation of color on the object)
+        cv2.addWeighted(mask_canvas, 0.7, img_cv, 0.3, 0, img_cv)
+
+        # Step 3: Draw sharp bounding boxes and text OVER the masks
+        for det in detection_details:
+            x1, y1, x2, y2 = map(int, det['coords'])
+            bright_color = det['bright_color']
+            
+            # Sharp bounding box
+            cv2.rectangle(img_cv, (x1, y1), (x2, y2), bright_color, 2)
+            
+            # Modern UI Text Label
+            txt = f"{det['label'].capitalize()} ({det['conf']:.2f})"
+            (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(img_cv, (x1, y1 - 20), (x1 + tw + 5, y1), bright_color, -1)
+            cv2.putText(img_cv, txt, (x1 + 2, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+
+    else:
+        # If no masks are detected, or the model is detection-only, 
+        # return original image and empty details.
+        if engine.overrides['task'] != 'segment':
+            st.warning("Mask rendering requires a YOLOv8-Seg (Segmentation) model. The provided model appears to be detection-only.")
+        detection_details = []
+
+    return cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB), detection_details
+
+# -----------------------------------------------------------------------------
+# 4. Integrated High-Tech Interface Layout
+# -----------------------------------------------------------------------------
+
+# Rich Gold Main Header
+st.markdown("<h1 class='luxury-head'>Aurum Vision Console</h1>", unsafe_allow_html=True)
+st.markdown("<p class='luxury-subhead'>Quantum Waste Segregation & Classification Engine</p>", unsafe_allow_html=True)
+
+# Main Application Container (st.markdown creates the wrapping div)
+with st.container():
+    st.write("---")
+    
+    # -------------------------------------------------
+    # INTEGRATED REFERENCE GUIDE (Top of Work Page)
+    # -------------------------------------------------
+    st.markdown("""
+    <div class="integrated-ref-grid">
+        <div class="ref-card" style="border-top-color: #3B82F6;">
+            <div class="ref-title" style="color: #3B82F6;">BLUE BIN</div>
+            <div class="ref-desc">Recyclable dry waste: plastics, paper, glass, cardboard, metals. Clean residue.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #10B981;">
+            <div class="ref-title" style="color: #10B981;">GREEN BIN</div>
+            <div class="ref-desc">Organic and compostable waste: food scraps, peels, kitchen waste, garden leaves.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #A1A1AA;">
+            <div class="ref-title" style="color: #A1A1AA;">BLACK BIN</div>
+            <div class="ref-desc">Sanitary, hazardous, non-recyclable domestic waste: diapers, e-waste, chemicals.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #EAB308;">
+            <div class="ref-title" style="color: #EAB308;">YELLOW BIN</div>
+            <div class="ref-desc">Biomedical and clinical waste: used syringes, bandages, expired medicine, clinical items.</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # -------------------------------------------------
+    # SCANNER INTERFACE
+    # -------------------------------------------------
+    # Control Panel
+    m1, m2 = st.columns([1, 1])
+    with m1:
+        input_mode = st.radio("Initializing Input Sensor", ["Static File", "Live Stream"], horizontal=True, label_visibility="collapsed")
+    
+    raw_img = None
+    if input_mode == "Static File":
+        up_file = st.file_uploader("Insert Image", type=["jpg", "jpeg", "png", "webp"])
+        if up_file:
+            raw_img = Image.open(up_file).convert("RGB")
+    else:
+        cam_file = st.camera_input("Activate Sensor")
+        if cam_file:
+            raw_img = Image.open(cam_file).convert("RGB")
+            
+    if raw_img is not None and engine is not None:
+        st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase;'>Sensor Input</p>", unsafe_allow_html=True)
+            st.image(raw_img, use_container_width=True)
+            
+        with col2:
+            st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase;'>Processed Analysis (Masks active)</p>", unsafe_allow_html=True)
+            with st.spinner("Processing via Aurum Engine..."):
+                start_t = time.time()
+                
+                # Run YOLO Inference with high confidence
+                y_results = engine.predict(source=np.array(raw_img), conf=0.45, verbose=False)
+                latency = round((time.time() - start_t) * 1000, 1)
+                
+                # Execute Luxury Segmentation Plotting
+                processed_img, det_list = draw_luxury_segmentation(raw_img, y_results[0])
+                
+                st.image(processed_img, use_container_width=True)
+                
+        # Metrics & breakdown
+        st.markdown("---")
+        if det_list:
+            st.markdown("<h3 style='font-size: 1.1rem; color: #FFFFFF;'>Segregation Directive</h3>", unsafe_allow_html=True)
+            for det in det_list:
+                st.markdown(
+                    f"<div style='padding: 12px; border-radius: 8px; border: 1px solid #1A1A1A; background-color: #0A0A0A; margin-bottom: 8px; color: #E0E0E0;'>"
+                    f"Route detected <strong style='color: #FFFFFF;'>{det['label'].capitalize()}</strong> "
+                    f"to <strong style='color: {det['hex']}; border-bottom: 1px solid {det['hex']};'>{det['bin']} Bin</strong>"
+                    f"</div>", 
+                    unsafe_allow_html=True
+                )
+        else:
+            st.info("No objects identified above confidence threshold.")
