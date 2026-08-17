@@ -6,7 +6,7 @@ import cv2
 import time
 
 # -----------------------------------------------------------------------------
-# 1. Luxury Page & UI Architecture (Responsive CSS)
+# 1. Luxury Page & UI Architecture (Advanced CSS)
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="VANTEDGE | Vision Console",
@@ -14,9 +14,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Deep Obsidian, Gold, & Rich Metal Theme with Mobile Responsiveness
+# Deep Obsidian, Gold, & Rich Metal Theme (Restored EXACTLY to original)
 st.markdown("""
 <style>
+    /* Load Google Font */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
     .stApp {
@@ -25,7 +26,7 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
     
-    /* VANTEDGE Header Customization */
+    /* Header Customization */
     h1, h2, h3 {
         color: #FFFFFF;
         font-weight: 300;
@@ -38,25 +39,30 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         font-weight: 600;
-        font-size: 2.8rem;
+        font-size: 2rem;
         margin-bottom: 0.2rem;
-        line-height: 1.2;
     }
     .luxury-subhead {
         color: #A1A1AA;
-        font-size: 1rem;
+        font-size: 0.9rem;
         margin-top: 0;
         margin-bottom: 2rem;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
     }
 
-    /* Container Styling */
+    /* Container Styling (Glassmorphism) */
     .element-container, div[data-testid="stVerticalBlock"] > div {
         background: transparent;
     }
     
-    /* Reference Cards Grid */
+    div.stCard {
+        background-color: #0A0A0A;
+        border: 1px solid #262626;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Reference Cards - Integrated on Main Page */
     .integrated-ref-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -77,19 +83,38 @@ st.markdown("""
     .ref-title { font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; }
     .ref-desc { font-size: 0.75rem; color: #D4D4D8; line-height: 1.4; }
 
-    /* Mobile Responsiveness Rules */
+    /* Button and Input Styling */
+    div.stButton > button:first-child {
+        background: linear-gradient(135deg, #262626 0%, #1A1A1A 100%);
+        color: #E6C657;
+        border: 1px solid #E6C657;
+        border-radius: 6px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(135deg, #E6C657 0%, #B6922E 100%);
+        color: #000000;
+        border-color: #000000;
+        box-shadow: 0 0 15px rgba(230, 198, 87, 0.4);
+    }
+    
+    /* Segment Table Styling */
+    div[data-testid="stDataFrame"] {
+        background-color: #0A0A0A;
+        border-radius: 8px;
+        border: 1px solid #262626;
+    }
+
+    /* Invisible Mobile Fixes (Does not change Desktop layout) */
     @media (max-width: 1024px) {
         .integrated-ref-grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 768px) {
-        h1.luxury-head { 
-            font-size: 2rem; 
-            letter-spacing: 0.1em;
-        }
-        .luxury-subhead { font-size: 0.85rem; }
-    }
-    @media (max-width: 480px) {
-        h1.luxury-head { font-size: 1.6rem; }
+        h1.luxury-head { font-size: 1.5rem; letter-spacing: 0.1em; }
         .integrated-ref-grid { grid-template-columns: 1fr; }
     }
 </style>
@@ -121,7 +146,7 @@ CLASS_TO_BIN = {
 }
 
 # -----------------------------------------------------------------------------
-# 3. Hybrid AI Engine (Supports Both Segmentation & Bounding Boxes)
+# 3. Hybrid High-Tech Engine (Masks & Boxes)
 # -----------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def load_engine(weights="best.pt"):
@@ -152,14 +177,12 @@ def draw_luxury_segmentation(image_pil, results_object):
             color_scheme = BIN_COLOR_MAP[bin_category]
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             
-            # If segmentation masks are available, use pixel-accurate polygon mask
             if masks is not None and len(masks) > i:
                 m_data = masks[i].data[0].cpu().numpy()
                 m_scaled = cv2.resize(m_data, (w, h))
                 bool_mask = m_scaled > 0.5
                 mask_canvas[bool_mask] = color_scheme['dark']
             else:
-                # Fallback: fill the bounding box region with a dark tinted mask
                 cv2.rectangle(mask_canvas, (x1, y1), (x2, y2), color_scheme['dark'], -1)
             
             detection_details.append({
@@ -171,16 +194,14 @@ def draw_luxury_segmentation(image_pil, results_object):
                 "coords": (x1, y1, x2, y2)
             })
 
-        # Blend the rich dark mask layer over the original image
         cv2.addWeighted(mask_canvas, 0.65, img_cv, 0.35, 0, img_cv)
 
-        # Draw sharp bounding boxes and modern badges over top
         for det in detection_details:
             x1, y1, x2, y2 = det['coords']
             bright_color = det['bright_color']
             
             cv2.rectangle(img_cv, (x1, y1), (x2, y2), bright_color, 2)
-            txt = f"{det['label'].capitalize()} | {det['bin']} Bin ({int(det['conf']*100)}%)"
+            txt = f"{det['label'].capitalize()} | {det['bin']} ({int(det['conf']*100)}%)"
             (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
             cv2.rectangle(img_cv, (x1, y1 - 22), (x1 + tw + 6, y1), bright_color, -1)
             cv2.putText(img_cv, txt, (x1 + 3, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
@@ -191,14 +212,13 @@ def draw_luxury_segmentation(image_pil, results_object):
 # 4. Integrated High-Tech Interface Layout
 # -----------------------------------------------------------------------------
 
-# VANTEDGE Branding
-st.markdown("<h1 class='luxury-head'>VANTEDGE</h1>", unsafe_allow_html=True)
-st.markdown("<p class='luxury-subhead'>Vision Waste Segregation Engine</p>", unsafe_allow_html=True)
+# Restored Original Header Formatting with VANTEDGE Branding
+st.markdown("<h1 class='luxury-head'>VANTEDGE Vision Console</h1>", unsafe_allow_html=True)
+st.markdown("<p class='luxury-subhead'>Quantum Waste Segregation & Classification Engine</p>", unsafe_allow_html=True)
 
 with st.container():
     st.write("---")
     
-    # Responsive Guide Grid
     st.markdown("""
     <div class="integrated-ref-grid">
         <div class="ref-card" style="border-top-color: #3B82F6;">
@@ -220,7 +240,6 @@ with st.container():
     </div>
     """, unsafe_allow_html=True)
     
-    # Input Logic with Camera Toggle
     m1, m2 = st.columns([1, 1])
     with m1:
         input_mode = st.radio("Initializing Input Sensor", ["Static File", "Live Stream"], horizontal=True, label_visibility="collapsed")
@@ -231,9 +250,9 @@ with st.container():
         if up_file:
             raw_img = Image.open(up_file).convert("RGB")
     else:
-        # Front / Back Camera Switch for iPad & Mobile
-        cam_facing = st.radio("Camera Source", ["Back Camera (Environment)", "Front Camera (User)"], horizontal=True)
-        mode = "environment" if "Back" in cam_facing else "user"
+        # Subtle Camera Toggle Added Here Without Breaking Layout
+        cam_facing = st.radio("Lens Array:", ["Rear (Environment)", "Front (User)"], horizontal=True)
+        mode = "environment" if "Rear" in cam_facing else "user"
         
         cam_file = st.camera_input("Activate Sensor", facing_mode=mode)
         if cam_file:
@@ -248,15 +267,14 @@ with st.container():
             st.image(raw_img, use_container_width=True)
             
         with col2:
-            st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase;'>Processed Analysis</p>", unsafe_allow_html=True)
-            with st.spinner("Processing via Vantedge AI..."):
+            st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase;'>Processed Analysis (Masks active)</p>", unsafe_allow_html=True)
+            with st.spinner("Processing via Vantedge Engine..."):
                 start_t = time.time()
                 y_results = engine.predict(source=np.array(raw_img), conf=0.45, verbose=False)
                 
                 processed_img, det_list = draw_luxury_segmentation(raw_img, y_results[0])
                 st.image(processed_img, use_container_width=True)
                 
-        # Segregation Directive
         st.markdown("---")
         if det_list:
             st.markdown("<h3 style='font-size: 1.1rem; color: #FFFFFF;'>Segregation Directive</h3>", unsafe_allow_html=True)
