@@ -4,309 +4,359 @@ from PIL import Image
 import numpy as np
 import cv2
 import time
+from datetime import datetime
 
 # -----------------------------------------------------------------------------
-# 1. Page & UI Configuration
+# 1. Luxury Page & UI Architecture (Advanced CSS)
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Vision | Waste Segregation Engine",
+    page_title="Vantedge AI | Waste Segmentation",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# Elite, High-End Custom CSS
+# Deep Obsidian, Gold, & Rich Metal Theme
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+
     .stApp {
-        background-color: #0A0A0A;
-        color: #EDEDED;
-        font-family: "Inter", sans-serif;
+        background-color: #000000;
+        color: #E0E0E0;
+        font-family: 'Poppins', sans-serif;
     }
-    h1, h2, h3 {
-        color: #FFFFFF;
-        font-weight: 300;
-        letter-spacing: -0.02em;
-    }
-    .guide-card {
-        padding: 1.5rem;
-        border-radius: 8px;
-        margin-bottom: 1rem;
-        border-left: 6px solid;
-        background-color: #171717;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    }
-    .guide-blue { border-color: #3B82F6; }
-    .guide-green { border-color: #10B981; }
-    .guide-black { border-color: #3F3F46; }
-    .guide-yellow { border-color: #EAB308; }
     
-    .guide-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
+    /* Vantedge Branding & Header */
+    .brand-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 5px;
+        padding-top: 1rem;
     }
-    div[data-testid="stMetricValue"] {
-        font-size: 2rem;
-        font-weight: 300;
-        color: #FFFFFF;
+    .vantedge-icon {
+        width: 45px;
+        height: 45px;
+        filter: drop-shadow(0px 4px 6px rgba(230, 198, 87, 0.2));
     }
-    div[data-testid="stMetricLabel"] {
-        color: #A1A1AA;
-        font-size: 0.85rem;
-        letter-spacing: 0.05em;
+    .luxury-head {
         text-transform: uppercase;
+        letter-spacing: 0.12em;
+        background: linear-gradient(135deg, #E6C657 0%, #B6922E 50%, #E6C657 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 600;
+        font-size: 2.2rem;
+        margin: 0;
+        padding: 0;
+    }
+    .luxury-subhead {
+        color: #A1A1AA;
+        font-size: 1rem;
+        letter-spacing: 0.05em;
+        margin-top: 5px;
+        margin-bottom: 2rem;
+        border-bottom: 1px solid #1A1A1A;
+        padding-bottom: 1rem;
+    }
+    .highlight-brand {
+        color: #E6C657;
+        font-weight: 500;
+    }
+
+    /* Reference Cards - Integrated on Main Page */
+    .integrated-ref-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .ref-card {
+        padding: 1.2rem;
+        border-radius: 8px;
+        border-top: 4px solid;
+        background: linear-gradient(180deg, #0A0A0A 0%, #050505 100%);
+        border-left: 1px solid #1A1A1A;
+        border-right: 1px solid #1A1A1A;
+        border-bottom: 1px solid #1A1A1A;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .ref-title { font-weight: 600; font-size: 1.05rem; margin-bottom: 0.3rem; letter-spacing: 0.05em; }
+    .ref-desc { font-size: 0.8rem; color: #A1A1AA; line-height: 1.5; }
+
+    /* Button Styling */
+    div.stButton > button:first-child {
+        background: linear-gradient(135deg, #262626 0%, #1A1A1A 100%);
+        color: #E6C657;
+        border: 1px solid #E6C657;
+        border-radius: 6px;
+        padding: 0.5rem 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(135deg, #E6C657 0%, #B6922E 100%);
+        color: #000000;
+        border-color: #000000;
+        box-shadow: 0 0 15px rgba(230, 198, 87, 0.3);
+    }
+    
+    /* Guide & History Elements */
+    .guide-step {
+        background-color: #0A0A0A;
+        border-left: 3px solid #E6C657;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 0 8px 8px 0;
+    }
+    .history-card {
+        background-color: #0A0A0A;
+        border: 1px solid #1A1A1A;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. Waste Classification Mapping
-# -----------------------------------------------------------------------------
-
-# RGB Color Definitions for OpenCV (Format: B, G, R)
-BIN_COLORS = {
-    "Blue": (246, 130, 59),    # #3B82F6
-    "Green": (129, 185, 16),   # #10B981
-    "Black": (100, 100, 100),  # #646464 (Lighter black/grey for visibility)
-    "Yellow": (8, 179, 234)    # #EAB308
-}
-
-# Hex Colors for UI elements
-UI_COLORS = {
-    "Blue": "#3B82F6",
-    "Green": "#10B981",
-    "Black": "#71717A",
-    "Yellow": "#EAB308"
-}
-
-# IMPORTANT: Map your exact Roboflow class names to the correct bin color here.
-# Change the keys ("plastic", "paper", etc.) to match your model's exact labels.
-# IMPORTANT: Map your exact Roboflow class names to the correct bin color here.
-CLASS_TO_BIN = {
-    # Blue Bin (Dry Recyclables)
-    "cardboard": "Blue",
-    "cloth": "Blue",
-    "dairy packets": "Blue",
-    "glass bottle": "Blue",
-    "metal can": "Blue",
-    "packaging box": "Blue",
-    "paper": "Blue",
-    "paper bag": "Blue",
-    "paper cup": "Blue",
-    "paper utensils": "Blue",
-    "plastic bag": "Blue",
-    "plastic bits": "Blue",
-    "plastic bottle": "Blue",
-    "plastic box": "Blue",
-    "plastic cup": "Blue",
-    "plastic packet": "Blue",
-    "plastic straw": "Blue",
-    "plastic utensils": "Blue",
-    "synthetic bag": "Blue",
-    "thermocol": "Blue",
-    
-    # Green Bin (Organic / Compostable)
-    "coconut shell": "Green",
-    "wood materials": "Green",
-    
-    # Black Bin (Sanitary / Hazardous / Non-recyclable Domestic)
-    "brick": "Black",
-    "broken glass": "Black",
-    "cigarette": "Black",
-    "footwear": "Black",
-    "mask": "Black",
-    "sanitary": "Black",
-    "tile": "Black",
-    "tobacco packet": "Black",
-    
-    # Yellow Bin (Biomedical / Clinical)
-    "medical waste": "Yellow"
-}
-
-
-# -----------------------------------------------------------------------------
-# 3. Core Engine & Drawing Functions
+# 2. State & Engine Initialization
 # -----------------------------------------------------------------------------
 if "history" not in st.session_state:
     st.session_state.history = []
 
+BIN_COLOR_MAP = {
+    "Blue":   {"bright": (246, 130, 59),  "dark": (150, 60, 10),   "hex": "#3B82F6"},
+    "Green":  {"bright": (129, 185, 16),  "dark": (20, 100, 10),   "hex": "#10B981"},
+    "Black":  {"bright": (180, 180, 180), "dark": (30, 30, 30),    "hex": "#A1A1AA"},
+    "Yellow": {"bright": (8, 179, 234),   "dark": (10, 100, 130),  "hex": "#EAB308"}
+}
+
+CLASS_TO_BIN = {
+    "cardboard": "Blue", "cloth": "Blue", "dairy packets": "Blue", "glass bottle": "Blue",
+    "metal can": "Blue", "packaging box": "Blue", "paper": "Blue", "paper bag": "Blue",
+    "paper cup": "Blue", "paper utensils": "Blue", "plastic bag": "Blue", "plastic bits": "Blue",
+    "plastic bottle": "Blue", "plastic box": "Blue", "plastic cup": "Blue", "plastic packet": "Blue",
+    "plastic straw": "Blue", "plastic utensils": "Blue", "synthetic bag": "Blue", "thermocol": "Blue",
+    "coconut shell": "Green", "wood materials": "Green",
+    "brick": "Black", "broken glass": "Black", "cigarette": "Black", "footwear": "Black",
+    "mask": "Black", "sanitary": "Black", "tile": "Black", "tobacco packet": "Black",
+    "medical waste": "Yellow"
+}
+
 @st.cache_resource(show_spinner=False)
-def load_model(weights_path="best.pt"):
+def load_engine(weights="best.pt"):
     try:
-        return YOLO(weights_path)
+        return YOLO(weights)
     except Exception as e:
-        st.error(f"Failed to load model: {e}")
+        st.error(f"Failed to load Vantedge AI engine: {e}")
         return None
 
-model = load_model()
+engine = load_engine()
 
-def draw_colored_boxes(image_pil, boxes, class_names):
-    """Draws custom colored bounding boxes and masks based on bin classification."""
+def draw_luxury_segmentation(image_pil, results_object):
+    """Hybrid drawing: Renders polygon masks if available, otherwise rich tinted boxes."""
     img_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
-    overlay = img_cv.copy()
+    h, w, _ = img_cv.shape
+    mask_canvas = np.zeros((h, w, 3), dtype=np.uint8)
     
-    detections_data = []
+    detection_details = []
+    boxes = results_object.boxes
+    masks = results_object.masks
 
-    for box in boxes:
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
-        cls_id = int(box.cls[0])
-        conf = float(box.conf[0])
-        label = class_names.get(cls_id, f"Class {cls_id}")
-        
-        # Determine Bin Category (Default to Black if not found in dictionary)
-        bin_category = CLASS_TO_BIN.get(label.lower(), "Black")
-        color = BIN_COLORS[bin_category]
-        ui_color = UI_COLORS[bin_category]
-        
-        # Draw translucent mask
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-        
-        # Draw sharp bounding box
-        cv2.rectangle(img_cv, (x1, y1), (x2, y2), color, 2)
-        
-        # Draw Label Background and Text
-        text = f"{label.capitalize()} ({conf:.2f})"
-        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-        cv2.rectangle(img_cv, (x1, y1 - 20), (x1 + tw + 5, y1), color, -1)
-        cv2.putText(img_cv, text, (x1 + 2, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        
-        detections_data.append({
-            "Detected Item": label.capitalize(),
-            "Bin Assignment": bin_category,
-            "Confidence": f"{conf * 100:.1f}%",
-            "Color": ui_color
-        })
+    if len(boxes) > 0:
+        for i, box in enumerate(boxes):
+            label_id = int(box.cls[0])
+            label_name = engine.names.get(label_id, f"Class {label_id}")
+            conf = float(box.conf[0])
+            
+            bin_category = CLASS_TO_BIN.get(label_name.lower(), "Black")
+            color_scheme = BIN_COLOR_MAP[bin_category]
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            
+            if masks is not None and len(masks) > i:
+                m_data = masks[i].data[0].cpu().numpy()
+                m_scaled = cv2.resize(m_data, (w, h))
+                bool_mask = m_scaled > 0.5
+                mask_canvas[bool_mask] = color_scheme['dark']
+            else:
+                cv2.rectangle(mask_canvas, (x1, y1), (x2, y2), color_scheme['dark'], -1)
+            
+            detection_details.append({
+                "label": label_name,
+                "conf": conf,
+                "bin": bin_category,
+                "bright_color": color_scheme['bright'],
+                "hex": color_scheme['hex'],
+                "coords": (x1, y1, x2, y2)
+            })
 
-    # Apply alpha blending for the mask effect
-    cv2.addWeighted(overlay, 0.3, img_cv, 0.7, 0, img_cv)
-    return cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB), detections_data
+        cv2.addWeighted(mask_canvas, 0.65, img_cv, 0.35, 0, img_cv)
+
+        for det in detection_details:
+            x1, y1, x2, y2 = det['coords']
+            bright_color = det['bright_color']
+            
+            cv2.rectangle(img_cv, (x1, y1), (x2, y2), bright_color, 2)
+            txt = f"{det['label'].capitalize()} | {det['bin']} Bin ({int(det['conf']*100)}%)"
+            (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+            cv2.rectangle(img_cv, (x1, y1 - 22), (x1 + tw + 6, y1), bright_color, -1)
+            cv2.putText(img_cv, txt, (x1 + 3, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+
+    return cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB), detection_details
 
 # -----------------------------------------------------------------------------
-# 4. Interface Architecture
+# 3. High-Tech Interface Layout & Branding
 # -----------------------------------------------------------------------------
 
-st.title("Waste Segregation Engine")
-st.markdown("Advanced computer vision system for Indian municipal and domestic waste classification.")
+# Vantedge AI Custom SVG Logo & Header
+st.markdown("""
+<div class="brand-container">
+    <svg class="vantedge-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="50,90 10,20 35,20 50,55 65,20 90,20" fill="url(#goldGradient)"/>
+        <defs>
+            <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#E6C657;stop-opacity:1" />
+                <stop offset="50%" style="stop-color:#B6922E;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#E6C657;stop-opacity:1" />
+            </linearGradient>
+        </defs>
+    </svg>
+    <h1 class='luxury-head'>Waste Detection And Segmentation</h1>
+</div>
+<p class='luxury-subhead'>Engineered by <span class="highlight-brand">Vantedge AI</span> • Proprietary Classification Model</p>
+""", unsafe_allow_html=True)
 
-# Navigation Tabs
-tab_scanner, tab_guide, tab_history = st.tabs(["Active Scanner", "Disposal Guide", "Scan History"])
-
-with tab_scanner:
-    with st.expander("System Initialization & Usage Instructions", expanded=True):
-        st.markdown("""
-        **How to use this tool:**
-        1. **Select Input Method:** Choose between uploading a local image file or activating your device camera.
-        2. **Capture/Upload:** Ensure the waste material is well-lit and clearly visible in the frame.
-        3. **Process:** The YOLOv8 AI model will automatically analyze the image.
-        4. **Review:** The system will draw a colored mask over the item, corresponding to the correct disposal bin (Blue, Green, Black, or Yellow).
-        """)
-        
-    input_mode = st.radio("Stream Selection", ["Image Upload", "Camera Capture"], horizontal=True, label_visibility="collapsed")
-    
-    raw_image = None
-    if input_mode == "Image Upload":
-        uploaded_file = st.file_uploader("Drop image file here", type=["jpg", "jpeg", "png", "webp"])
-        if uploaded_file:
-            raw_image = Image.open(uploaded_file).convert("RGB")
-    else:
-        camera_file = st.camera_input("Initialize Camera")
-        if camera_file:
-            raw_image = Image.open(camera_file).convert("RGB")
-            
-    if raw_image is not None and model is not None:
-        st.markdown("---")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("<h3 style='font-size: 1.2rem; color: #A1A1AA;'>Source Input</h3>", unsafe_allow_html=True)
-            st.image(raw_image, use_container_width=True)
-            
-        with col2:
-            st.markdown("<h3 style='font-size: 1.2rem; color: #A1A1AA;'>Processed Analysis</h3>", unsafe_allow_html=True)
-            with st.spinner("Executing neural network..."):
-                start_time = time.time()
-                
-                # Run YOLO Inference (suppress drawing, we do it manually)
-                results = model.predict(source=np.array(raw_image), conf=0.35, iou=0.45, verbose=False)
-                latency = round((time.time() - start_time) * 1000, 2)
-                
-                res = results[0]
-                
-                # Apply custom drawing logic
-                if len(res.boxes) > 0:
-                    annotated_image, detection_details = draw_colored_boxes(raw_image, res.boxes, model.names)
-                else:
-                    annotated_image = np.array(raw_image)
-                    detection_details = []
-                
-                st.image(annotated_image, use_container_width=True)
-                
-                # Store History
-                st.session_state.history.append({
-                    "timestamp": time.strftime("%H:%M:%S"),
-                    "thumbnail": annotated_image.copy(),
-                    "details": detection_details,
-                    "latency": latency
-                })
-
-        st.markdown("---")
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Objects Identified", len(detection_details))
-        m2.metric("Inference Latency", f"{latency} ms")
-        m3.metric("System Status", "Optimal")
-        
-        if detection_details:
-            st.markdown("<h3 style='font-size: 1.2rem; margin-top: 1rem;'>Segregation Instructions</h3>", unsafe_allow_html=True)
-            for item in detection_details:
-                st.markdown(
-                    f"<div style='padding: 10px; border-left: 4px solid {item['Color']}; background-color: #171717; margin-bottom: 5px; border-radius: 4px;'>"
-                    f"<strong style='color: #FFFFFF;'>{item['Detected Item']}</strong> "
-                    f"<span style='color: #A1A1AA;'>({item['Confidence']})</span> — "
-                    f"Route to <strong style='color: {item['Color']};'>{item['Bin Assignment']} Bin</strong>"
-                    f"</div>", 
-                    unsafe_allow_html=True
-                )
-
-with tab_guide:
-    st.markdown("### Standard Segregation Protocol")
-    st.markdown("The system automatically color-codes detections to match the following municipal standards:")
-    
+# Main Application Container
+with st.container():
+    # -------------------------------------------------
+    # INTEGRATED REFERENCE GUIDE
+    # -------------------------------------------------
     st.markdown("""
-    <div class="guide-card guide-blue">
-        <div class="guide-title" style="color: #3B82F6;">Blue Bin (Dry Recyclables)</div>
-        <div style="color: #D4D4D8;">Designated for recyclable dry waste. This includes plastics, paper, cardboard, glass, and metals. Items should be rinsed and free of heavy food residue before disposal.</div>
-    </div>
-    
-    <div class="guide-card guide-green">
-        <div class="guide-title" style="color: #10B981;">Green Bin (Organic Waste)</div>
-        <div style="color: #D4D4D8;">Designated for compostable, organic, kitchen, and garden waste. This includes fruit peels, vegetable scraps, leftover food, and dead leaves.</div>
-    </div>
-    
-    <div class="guide-card guide-black">
-        <div class="guide-title" style="color: #A1A1AA;">Black Bin (Domestic/Hazardous)</div>
-        <div style="color: #D4D4D8;">Designated for sanitary, hazardous, and domestic waste that cannot be recycled or composted. This includes diapers, sanitary napkins, e-waste, batteries, and chemically contaminated materials.</div>
-    </div>
-    
-    <div class="guide-card guide-yellow">
-        <div class="guide-title" style="color: #EAB308;">Yellow Bin (Biomedical Waste)</div>
-        <div style="color: #D4D4D8;">Designated for biomedical and clinical waste. This includes used syringes, bandages, expired medicines, and any materials exposed to bodily fluids.</div>
+    <div class="integrated-ref-grid">
+        <div class="ref-card" style="border-top-color: #3B82F6;">
+            <div class="ref-title" style="color: #3B82F6;">BLUE BIN</div>
+            <div class="ref-desc">Recyclable dry waste: plastics, paper, glass, cardboard, metals. Clean residue.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #10B981;">
+            <div class="ref-title" style="color: #10B981;">GREEN BIN</div>
+            <div class="ref-desc">Organic and compostable waste: food scraps, peels, kitchen waste, garden leaves.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #A1A1AA;">
+            <div class="ref-title" style="color: #A1A1AA;">BLACK BIN</div>
+            <div class="ref-desc">Sanitary, hazardous, non-recyclable domestic waste: diapers, e-waste, chemicals.</div>
+        </div>
+        <div class="ref-card" style="border-top-color: #EAB308;">
+            <div class="ref-title" style="color: #EAB308;">YELLOW BIN</div>
+            <div class="ref-desc">Biomedical and clinical waste: used syringes, bandages, expired medicine, clinical items.</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # -------------------------------------------------
+    # TABS: SCANNER | HISTORY | USER GUIDE
+    # -------------------------------------------------
+    tab_scan, tab_history, tab_guide = st.tabs(["ACTIVE SCANNER", "SESSION HISTORY", "USER GUIDE"])
+    
+    # --- TAB 1: SCANNER ---
+    with tab_scan:
+        st.markdown("<br>", unsafe_allow_html=True)
+        m1, m2 = st.columns([1, 1])
+        with m1:
+            input_mode = st.radio("Initializing Sensor Array", ["Static Image Upload", "Live Camera Feed"], horizontal=True, label_visibility="collapsed")
+        
+        raw_img = None
+        if input_mode == "Static Image Upload":
+            up_file = st.file_uploader("Insert Image Data", type=["jpg", "jpeg", "png", "webp"])
+            if up_file:
+                raw_img = Image.open(up_file).convert("RGB")
+        else:
+            cam_file = st.camera_input("Activate Optical Sensor")
+            if cam_file:
+                raw_img = Image.open(cam_file).convert("RGB")
+                
+        if raw_img is not None and engine is not None:
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase; letter-spacing: 1px;'>Raw Optical Input</p>", unsafe_allow_html=True)
+                st.image(raw_img, use_container_width=True)
+                
+            with col2:
+                st.markdown("<p style='font-size: 0.8rem; color: #A1A1AA; text-transform: uppercase; letter-spacing: 1px;'>Vantedge AI Analysis (Masks Active)</p>", unsafe_allow_html=True)
+                with st.spinner("Vantedge Neural Engine Processing..."):
+                    start_t = time.time()
+                    
+                    # YOLO Inference
+                    y_results = engine.predict(source=np.array(raw_img), conf=0.40, verbose=False)
+                    latency = round((time.time() - start_t) * 1000, 1)
+                    
+                    # Core Masking/Boxing
+                    processed_img, det_list = draw_luxury_segmentation(raw_img, y_results[0])
+                    st.image(processed_img, use_container_width=True)
+                    
+                    # Log to History
+                    st.session_state.history.append({
+                        "id": datetime.now().strftime("%H:%M:%S"),
+                        "thumb": processed_img,
+                        "latency": latency,
+                        "details": det_list
+                    })
 
-with tab_history:
-    st.markdown("### Session Scan History")
-    if not st.session_state.history:
-        st.markdown("<p style='color: #A1A1AA;'>No scans processed in the current session.</p>", unsafe_allow_html=True)
-    else:
-        for idx, item in enumerate(reversed(st.session_state.history)):
-            with st.expander(f"Scan {len(st.session_state.history) - idx} at {item['timestamp']}"):
-                h_col1, h_col2 = st.columns([1, 2])
-                with h_col1:
-                    st.image(item["thumbnail"], width=250)
-                with h_col2:
-                    st.markdown(f"**Processing Time:** {item['latency']} ms")
-                    if item["details"]:
-                        for det in item["details"]:
-                            st.markdown(f"- **{det['Detected Item']}** → {det['Bin Assignment']} Bin")
-                    else:
-                        st.write("No objects identified.")
+            st.markdown("---")
+            if det_list:
+                st.markdown("<h3 style='font-size: 1.2rem; color: #E6C657; font-weight: 400;'>Segregation Directives Executed</h3>", unsafe_allow_html=True)
+                for det in det_list:
+                    st.markdown(
+                        f"<div style='padding: 12px; border-radius: 6px; border-left: 4px solid {det['hex']}; background-color: #0A0A0A; margin-bottom: 8px; color: #E0E0E0;'>"
+                        f"Item identified as <strong style='color: #FFFFFF;'>{det['label'].capitalize()}</strong> "
+                        f"— Authorized for <strong style='color: {det['hex']};'>{det['bin'].upper()} BIN</strong> disposal."
+                        f"</div>", 
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.info("Zero objects detected matching current confidence thresholds.")
+
+    # --- TAB 2: HISTORY ---
+    with tab_history:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if not st.session_state.history:
+            st.markdown("<p style='color: #A1A1AA;'>No inference tasks executed in the current session.</p>", unsafe_allow_html=True)
+        else:
+            for item in reversed(st.session_state.history):
+                with st.container():
+                    st.markdown(f"<div class='history-card'>", unsafe_allow_html=True)
+                    h_col1, h_col2 = st.columns([1, 3])
+                    with h_col1:
+                        st.image(item['thumb'], use_container_width=True)
+                    with h_col2:
+                        st.markdown(f"<strong style='color: #E6C657;'>Scan ID:</strong> {item['id']}", unsafe_allow_html=True)
+                        st.markdown(f"<strong style='color: #E6C657;'>Compute Latency:</strong> {item['latency']} ms", unsafe_allow_html=True)
+                        st.markdown(f"<strong style='color: #E6C657;'>Items Detected:</strong> {len(item['details'])}", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+    # --- TAB 3: USER GUIDE ---
+    with tab_guide:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #E6C657; font-size: 1.3rem; margin-bottom: 15px;'>Vantedge AI Operational Protocol</h3>", unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="guide-step">
+            <strong style="color: #FFFFFF;">1. Initialization:</strong> 
+            <span style="color: #A1A1AA;">Select between static image upload or live optical camera feed via the radio buttons in the Active Scanner tab.</span>
+        </div>
+        <div class="guide-step">
+            <strong style="color: #FFFFFF;">2. Environmental Controls:</strong> 
+            <span style="color: #A1A1AA;">Ensure the target waste material is well-lit. Avoid extreme shadows or heavy occlusion (stacking items on top of one another).</span>
+        </div>
+        <div class="guide-step">
+            <strong style="color: #FFFFFF;">3. Distance Parameters:</strong> 
+            <span style="color: #A1A1AA;">Maintain a standard distance of 30cm to 100cm between the lens and the subject for optimal feature extraction.</span>
+        </div>
+        <div class="guide-step">
+            <strong style="color: #FFFFFF;">4. Execution:</strong> 
+            <span style="color: #A1A1AA;">Upon capturing the image, the Vantedge engine will autonomously generate localized bounding boxes, rich segmentation masks, and precise bin routing directives based on municipal regulations.</span>
+        </div>
+        """, unsafe_allow_html=True)
